@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 9.00
 # Visual Studio 2005
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GPS", "GPS\GPS.csproj", "{32F8D83A-1113-4D31-868E-623AE253084D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GPS", "GPS.csproj", "{32F8D83A-1113-4D31-868E-623AE253084D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
