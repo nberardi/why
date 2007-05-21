@@ -10,6 +10,9 @@ namespace GPS
 	/// <seealso href="http://www.gpsinformation.org/dale/nmea.htm#RMC"/>
 	public struct RmcCommand
 	{
+		private const float KnotsToMilesPerHour = 1.15077945F;
+		private const float KnotsToKilometersPerHour = 1.85200F;
+
 		private DateTime _takenAt;
 		private char _status;
 		private Location _location;
@@ -51,6 +54,26 @@ namespace GPS
 			_trackAngle = String.IsNullOrEmpty(data[8]) ? (float?)null : Convert.ToSingle(data[8]);
 
 			_magneticVariation = Convert.ToDecimal(data[9]) * (data[10].ToUpper() == "E" ? 1M : -1M);
+		}
+
+		public float DirectionalAngle
+		{
+			get { return _trackAngle ?? 0; }
+		}
+
+		public float Knots
+		{
+			get { return _speedKnots; }
+		}
+
+		public float MilesPerHour
+		{
+			get { return _speedKnots * KnotsToMilesPerHour; }
+		}
+
+		public float KilometersPerHour
+		{
+			get { return _speedKnots * KnotsToKilometersPerHour; }
 		}
 	}
 }

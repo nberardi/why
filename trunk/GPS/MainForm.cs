@@ -17,6 +17,7 @@ namespace GPS
 			Control.CheckForIllegalCrossThreadCalls = false;
 
 			_gps = new Gps();
+			_gps.DataReceived += new GpsEventHandler(gps_DataReceived);
 
 			InitializeComponent();
 		}
@@ -50,12 +51,41 @@ namespace GPS
 			portList.Enabled = true;
 		}
 
+		private void gps_DataReceived ()
+		{
+			directionImage.Invalidate();
+			RefreshDistance();
+		}
+
+		private void refreshSatelliteTimer_Tick (object sender, EventArgs e)
+		{
+			RefreshSattellites();
+		}
+
+		private void distance_CheckedChanged (object sender, EventArgs e)
+		{
+			RefreshDistance();
+		}
+
+		private void RefreshDistance ()
+		{
+			float speed = _gps.Knots;
+
+			if (milesPerHourRadio.Checked)
+				speed = _gps.MilesPerHour;
+			else if (kilometersPerHourRadio.Checked)
+				speed = _gps.KilometersPerHour;
+
+			speedLabel.Text = speed.ToString("N2");
+
+		}
+
 		private void RefreshSattellites ()
 		{
 			satilliteLocationImage.Invalidate();
 
 			Satellite[] satellites = _gps.Satellites;
-			for(int i = 0; i < satellites.Length; i++) {
+			for (int i = 0; i < satellites.Length; i++) {
 				Satellite sat = satellites[i];
 				ListViewItem item = sat.Tag as ListViewItem;
 
@@ -116,9 +146,22 @@ namespace GPS
 			}
 		}
 
-		private void refreshSatelliteTimer_Tick (object sender, EventArgs e)
+		private void directionImage_Paint (object sender, PaintEventArgs e)
 		{
-			RefreshSattellites();
+			int centerX = directionImage.Bounds.Width / 2;
+			int centerY = directionImage.Bounds.Height / 2;
+			float maxWidth = Math.Min((float)directionImage.Bounds.Height, (float)directionImage.Bounds.Width) - 5F;
+			float centerXF = (float)directionImage.Bounds.Width / 2F;
+			float centerYF = (float)directionImage.Bounds.Height / 2F;
+			float radius = maxWidth / 2F;
+
+			e.Graphics.DrawLine(Pens.Black, new Point(0, centerY), new Point(directionImage.Bounds.Width, centerY));
+			e.Graphics.DrawLine(Pens.Black, new Point(centerX, 0), new Point(centerX, directionImage.Bounds.Height));
+			e.Graphics.DrawEllipse(Pens.Black, centerXF - (maxWidth / 2F), centerYF - (maxWidth / 2F), maxWidth, maxWidth);
+
+			using (Pen anglePen = new Pen(Color.Blue, 4F)) {
+				e.Graphics.DrawLine(anglePen, new PointF(centerX, centerY), new PointF((radius * Convert.ToSingle(Math.Cos(_gps.DirectionalAngle))) + centerXF, (radius * Convert.ToSingle(Math.Sin(_gps.DirectionalAngle))) + centerYF));
+			}
 		}
 	}
 }

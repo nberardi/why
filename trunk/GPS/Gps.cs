@@ -7,7 +7,7 @@ using System.Timers;
 
 namespace GPS
 {
-	public delegate void GpsSatelliteEventHandler ();
+	public delegate void GpsEventHandler ();
 	public delegate void GpsCommandEventHandler (string command);
 
 	public class Gps : IDisposable
@@ -32,7 +32,15 @@ namespace GPS
 			_timer.Elapsed += new ElapsedEventHandler(timer_Elapsed);
 		}
 
-		public event GpsSatelliteEventHandler SatellitesChanged;
+		public event GpsEventHandler DataReceived;
+
+		private void OnDataReceived ()
+		{
+			if (DataReceived != null)
+				DataReceived();
+		}
+
+		public event GpsEventHandler SatellitesChanged;
 
 		private void OnSatellitesChanged ()
 		{
@@ -52,6 +60,26 @@ namespace GPS
 		{
 			get { return _comPort; }
 			set { _comPort = value; }
+		}
+
+		public float MilesPerHour
+		{
+			get { return _lastRmc.MilesPerHour; }
+		}
+
+		public float KilometersPerHour
+		{
+			get { return _lastRmc.KilometersPerHour; }
+		}
+
+		public float Knots
+		{
+			get { return _lastRmc.Knots; }
+		}
+
+		public float DirectionalAngle
+		{
+			get { return (_lastRmc.DirectionalAngle - 90F) * Convert.ToSingle(Math.PI / 180D); }
 		}
 
 		public Satellite[] Satellites
@@ -132,6 +160,7 @@ namespace GPS
 
 				case "RMC":
 					_lastRmc = new RmcCommand(data);
+					OnDataReceived();
 					break;
 
 				case "GLL":
