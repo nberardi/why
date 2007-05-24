@@ -43,7 +43,7 @@ namespace GPS
 	{
 		private DateTime _takenAt;
 		private Location _location;
-		private FixQuality _quanlity;
+		private FixQuality _quality;
 		private byte _satelliteCount;
 		private float _horizontalDilution;
 		private float _meanSeaLevel;
@@ -74,7 +74,7 @@ namespace GPS
 
 			decimal longitude = (((decimal)longitudeDeg) + (longitudeMins / 60M)) * (data[5].ToUpper() == "E" ? 1M : -1M);
 
-			_quanlity = (FixQuality)Convert.ToInt32(data[6]);
+			_quality = (FixQuality)Convert.ToInt32(data[6]);
 
 			_satelliteCount = Convert.ToByte(data[7]);
 
