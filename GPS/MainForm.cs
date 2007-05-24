@@ -120,6 +120,7 @@ namespace GPS
 
 				case "GSA":
 					_lastGsa = new GsaCommand(data);
+					RefreshSattellites();
 					break;
 
 				case "GSV":
@@ -168,7 +169,8 @@ namespace GPS
 
 		private void RefreshSattellites ()
 		{
-			Satellite[] satellites = _lastGsv.Satellites;
+			Satellite[] satellites = this.Satellites;
+
 			for (int i = 0; i < satellites.Length; i++) {
 				Satellite sat = satellites[i];
 				ListViewItem item = sat.Tag as ListViewItem;
@@ -214,7 +216,7 @@ namespace GPS
 			if (_lastGsv == null)
 				return;
 
-			Satellite[] satellites = _lastGsv.Satellites;
+			Satellite[] satellites = this.Satellites;
 
 			if (satellites != null && satellites.Length > 0) {
 
