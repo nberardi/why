@@ -17,7 +17,8 @@ namespace GPS
 			Control.CheckForIllegalCrossThreadCalls = false;
 
 			_gps = new Gps();
-			_gps.DataReceived += new GpsEventHandler(gps_DataReceived);
+			_gps.TrackingChanged += new GpsEventHandler<RmcCommand>(gps_TrackingChanged);
+			_gps.ViewableSatellitesChanged += new GpsEventHandler<GsvCommand>(gps_ViewableSatellitesChanged);
 
 			InitializeComponent();
 		}
@@ -51,13 +52,14 @@ namespace GPS
 			portList.Enabled = true;
 		}
 
-		private void gps_DataReceived ()
+		private void gps_TrackingChanged (RmcCommand command)
 		{
 			directionImage.Invalidate();
+			bearingValueLabel.Text = command.DirectionalAngle.ToString();
 			RefreshDistance();
 		}
 
-		private void refreshSatelliteTimer_Tick (object sender, EventArgs e)
+		private void gps_ViewableSatellitesChanged (GsvCommand command)
 		{
 			RefreshSattellites();
 		}
@@ -77,12 +79,11 @@ namespace GPS
 				speed = _gps.KilometersPerHour;
 
 			speedLabel.Text = speed.ToString("N2");
-
 		}
 
 		private void RefreshSattellites ()
 		{
-			satilliteLocationImage.Invalidate();
+			bool redraw = false;
 
 			Satellite[] satellites = _gps.Satellites;
 			for (int i = 0; i < satellites.Length; i++) {
@@ -98,10 +99,13 @@ namespace GPS
 					);
 
 					satelliteList.Items.Add(item);
+					redraw = true;
 				}
 
 				sat.Tag = item;
 			}
+
+			satilliteLocationImage.Invalidate();
 		}
 
 		private void satilliteLocationImage_Paint (object sender, PaintEventArgs e)
@@ -139,7 +143,7 @@ namespace GPS
 							float satY = centerYF - Convert.ToSingle(h * Math.Cos(((float)sat.Azimuth * Math.PI) / 180D));
 
 							e.Graphics.DrawRectangle(sat.HasFix ? hasFixSatellitePen : satellitePen, satX, satY, 4F, 4F);
-							e.Graphics.DrawString(sat.Prn.ToString(), new Font("Verdana", 8, FontStyle.Regular), new System.Drawing.SolidBrush(Color.Black), new PointF(satX + 5F, satY + 5F));
+							e.Graphics.DrawString(sat.Prn.ToString(), new Font("Tahoma", 8, FontStyle.Regular), new System.Drawing.SolidBrush(Color.Black), new PointF(satX + 5F, satY + 5F));
 						}
 					}
 				}
@@ -150,7 +154,7 @@ namespace GPS
 		{
 			int centerX = directionImage.Bounds.Width / 2;
 			int centerY = directionImage.Bounds.Height / 2;
-			float maxWidth = Math.Min((float)directionImage.Bounds.Height, (float)directionImage.Bounds.Width) - 5F;
+			float maxWidth = Math.Min((float)directionImage.Bounds.Height, (float)directionImage.Bounds.Width) - 40F;
 			float centerXF = (float)directionImage.Bounds.Width / 2F;
 			float centerYF = (float)directionImage.Bounds.Height / 2F;
 			float radius = maxWidth / 2F;
@@ -158,6 +162,13 @@ namespace GPS
 			e.Graphics.DrawLine(Pens.Black, new Point(0, centerY), new Point(directionImage.Bounds.Width, centerY));
 			e.Graphics.DrawLine(Pens.Black, new Point(centerX, 0), new Point(centerX, directionImage.Bounds.Height));
 			e.Graphics.DrawEllipse(Pens.Black, centerXF - (maxWidth / 2F), centerYF - (maxWidth / 2F), maxWidth, maxWidth);
+
+			using (Font directionFont = new Font("Tahoma", 12F, FontStyle.Bold)) {
+				e.Graphics.DrawString("N", directionFont, Brushes.Purple, centerXF, 0F);
+				e.Graphics.DrawString("S", directionFont, Brushes.Purple, centerXF, directionImage.Bounds.Height - 20);
+				e.Graphics.DrawString("E", directionFont, Brushes.Purple, directionImage.Bounds.Width - 20, centerYF);
+				e.Graphics.DrawString("W", directionFont, Brushes.Purple, 0, centerYF);
+			}
 
 			using (Pen anglePen = new Pen(Color.Blue, 4F)) {
 				e.Graphics.DrawLine(anglePen, new PointF(centerX, centerY), new PointF((radius * Convert.ToSingle(Math.Cos(_gps.DirectionalAngle))) + centerXF, (radius * Convert.ToSingle(Math.Sin(_gps.DirectionalAngle))) + centerYF));

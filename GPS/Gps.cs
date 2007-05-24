@@ -7,7 +7,7 @@ using System.Timers;
 
 namespace GPS
 {
-	public delegate void GpsEventHandler ();
+	public delegate void GpsEventHandler<T> (T command);
 	public delegate void GpsCommandEventHandler (string command);
 
 	public class Gps : IDisposable
@@ -22,30 +22,62 @@ namespace GPS
 		private GsvCommand _lastGsv;
 		private RmcCommand _lastRmc;
 		private GllCommand _lastGll;
-		private VtgCommand _lastVtg;
 
 		public Gps ()
 		{
 			_timer = new Timer();
 			_timer.AutoReset = true;
-			_timer.Interval = 500;
+			_timer.Interval = 250;
 			_timer.Elapsed += new ElapsedEventHandler(timer_Elapsed);
+
+			_port = new SerialPort();
+			_port.Parity = Parity.None;
+			_port.BaudRate = 4800;
+			_port.StopBits = StopBits.One;
+			_port.DataBits = 8;
+			_port.NewLine = "\r\n";
+			_port.ReadBufferSize = 256;
+			_port.ReadTimeout = 0;
 		}
 
-		public event GpsEventHandler DataReceived;
+		public event GpsEventHandler<GgaCommand> FixChanged;
 
-		private void OnDataReceived ()
+		private void OnFixChanged (GgaCommand command)
 		{
-			if (DataReceived != null)
-				DataReceived();
+			if (FixChanged != null)
+				FixChanged(command);
 		}
 
-		public event GpsEventHandler SatellitesChanged;
+		public event GpsEventHandler<GllCommand> PositionChanged;
 
-		private void OnSatellitesChanged ()
+		private void OnPositionChanged (GllCommand command)
 		{
-			if (SatellitesChanged != null)
-				SatellitesChanged();
+			if (PositionChanged != null)
+				PositionChanged(command);
+		}
+
+		public event GpsEventHandler<GsaCommand> SatelliteStatusChanged;
+
+		private void OnSatelliteStatusChanged (GsaCommand command)
+		{
+			if (SatelliteStatusChanged != null)
+				SatelliteStatusChanged(command);
+		}
+
+		public event GpsEventHandler<RmcCommand> TrackingChanged;
+
+		private void OnTrackingChanged (RmcCommand command)
+		{
+			if (TrackingChanged != null)
+				TrackingChanged(command);
+		}
+
+		public event GpsEventHandler<GsvCommand> ViewableSatellitesChanged;
+
+		private void OnViewableSatellitesChanged (GsvCommand command)
+		{
+			if (ViewableSatellitesChanged != null)
+				ViewableSatellitesChanged(command);
 		}
 
 		public event GpsCommandEventHandler CommandReceived;
@@ -100,15 +132,8 @@ namespace GPS
 
 		public void Start ()
 		{
-			_port = new SerialPort();
 			_port.PortName = _comPort;
-			_port.Parity = Parity.None;
-			_port.BaudRate = 4800;
-			_port.StopBits = StopBits.One;
-			_port.DataBits = 8;
-			_port.NewLine = "\r\n";
 			_port.Open();
-
 			_timer.Start();
 		}
 
@@ -137,7 +162,7 @@ namespace GPS
 			if (data[0] != '$')
 				return;
 
-			System.Diagnostics.Debug.WriteLine(data, "Command");
+			//System.Diagnostics.Debug.WriteLine(data, "Command");
 
 			if (data.IndexOf('*') != -1)
 				data = data.Substring(0, data.IndexOf('*'));
@@ -146,29 +171,27 @@ namespace GPS
 
 				case "GGA":
 					_lastGga = new GgaCommand(data);
+					OnFixChanged(_lastGga);
 					break;
 
 				case "GSA":
 					_lastGsa = new GsaCommand(data);
-					OnSatellitesChanged();
+					OnSatelliteStatusChanged(_lastGsa);
 					break;
 
 				case "GSV":
 					_lastGsv = _lastGsv + new GsvCommand(data);
-					OnSatellitesChanged();
+					OnViewableSatellitesChanged(_lastGsv);
 					break;
 
 				case "RMC":
 					_lastRmc = new RmcCommand(data);
-					OnDataReceived();
+					OnTrackingChanged(_lastRmc);
 					break;
 
 				case "GLL":
 					_lastGll = new GllCommand(data);
-					break;
-
-				case "VTG":
-					_lastVtg = new VtgCommand(data);
+					OnPositionChanged(_lastGll);
 					break;
 
 				default:
