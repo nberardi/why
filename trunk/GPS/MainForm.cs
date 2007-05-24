@@ -2,25 +2,28 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
+using System.IO;
+using System.IO.Ports;
 using System.Text;
-using System.Threading;
 using System.Windows.Forms;
 
 namespace GPS
 {
 	public partial class MainForm : Form
 	{
-		private Gps _gps;
+		private GgaCommand _lastGga;
+		private GsaCommand _lastGsa;
+		private GsvCommand _lastGsv;
+		private RmcCommand _lastRmc;
+		private GllCommand _lastGll;
 
 		public MainForm ()
 		{
 			Control.CheckForIllegalCrossThreadCalls = false;
-
-			_gps = new Gps();
-			_gps.TrackingChanged += new GpsEventHandler<RmcCommand>(gps_TrackingChanged);
-			_gps.ViewableSatellitesChanged += new GpsEventHandler<GsvCommand>(gps_ViewableSatellitesChanged);
-
+			
 			InitializeComponent();
+
+			_port.NewLine = "\r\n";
 		}
 
 		protected override void OnLoad (EventArgs e)
@@ -31,14 +34,32 @@ namespace GPS
 			base.OnLoad(e);
 		}
 
+		public Satellite[] Satellites
+		{
+			get
+			{
+				if (_lastGsv == null)
+					return new Satellite[0];
+
+				List<Satellite> sats = new List<Satellite>(_lastGsv.Satellites);
+
+				for (int i = 0; i < sats.Count; i++)
+					sats[i] = sats[i] + _lastGsa;
+
+				return sats.ToArray();
+			}
+		}
+
 		private void portList_SelectedIndexChanged (object sender, EventArgs e)
 		{
-			_gps.ComPort = portList.SelectedItem as string;
+			_port.PortName = portList.SelectedItem as string;
 		}
 
 		private void connectButton_Click (object sender, EventArgs e)
 		{
-			_gps.Start();
+			_port.Open();
+			_timer.Start();
+
 			connectButton.Enabled = false;
 			disconnectButton.Enabled = true;
 			portList.Enabled = false;
@@ -46,22 +67,30 @@ namespace GPS
 
 		private void disconnectButton_Click (object sender, EventArgs e)
 		{
-			_gps.Stop();
+			_timer.Stop();
+			_port.Close();
+
 			connectButton.Enabled = true;
 			disconnectButton.Enabled = false;
 			portList.Enabled = true;
 		}
 
-		private void gps_TrackingChanged (RmcCommand command)
+		private void timer_Tick (object sender, EventArgs e)
 		{
-			directionImage.Invalidate();
-			bearingValueLabel.Text = command.DirectionalAngle.ToString();
-			RefreshDistance();
-		}
+			try {
+				string data = _port.ReadLine();
 
-		private void gps_ViewableSatellitesChanged (GsvCommand command)
+				if (String.IsNullOrEmpty(data) == false) {
+					ProcessCommand(data);
+				}
+			} catch (Exception exc) {
+				System.Diagnostics.Debug.WriteLine(exc);
+			}
+		}
+		
+		private void altitude_CheckedChanged (object sender, EventArgs e)
 		{
-			RefreshSattellites();
+			RefreshAltitude();
 		}
 
 		private void distance_CheckedChanged (object sender, EventArgs e)
@@ -69,23 +98,77 @@ namespace GPS
 			RefreshDistance();
 		}
 
+		private void ProcessCommand (string data)
+		{
+			// all commands start with dollar signs
+			if (data[0] != '$')
+				return;
+
+			//System.Diagnostics.Debug.WriteLine(data, "Command");
+
+			if (data.IndexOf('*') != -1)
+				data = data.Substring(0, data.IndexOf('*'));
+
+			switch (data.Substring(3, 3)) {
+
+				case "GGA":
+					_lastGga = new GgaCommand(data);
+					latitudeValueLabel.Text = _lastGga.Location.Latitude.ToString("N6");
+					longitudeValueLabel.Text = _lastGga.Location.Longitude.ToString("N6");
+					RefreshAltitude();
+					break;
+
+				case "GSA":
+					_lastGsa = new GsaCommand(data);
+					break;
+
+				case "GSV":
+					_lastGsv = _lastGsv + new GsvCommand(data);
+					RefreshSattellites();
+					break;
+
+				case "RMC":
+					_lastRmc = new RmcCommand(data);
+					directionImage.Invalidate();
+					bearingValueLabel.Text = _lastRmc.DirectionalAngleInDegrees.ToString();
+					RefreshDistance();
+					break;
+
+				case "GLL":
+					_lastGll = new GllCommand(data);
+					break;
+
+				default:
+					System.Diagnostics.Trace.WriteLine("*** " + data.Substring(3, 3) + " Not Handled", "Command");
+					break;
+			}
+		}
+
+		private void RefreshAltitude ()
+		{
+			float altitude = _lastGga.Location.AltitudeInFeet;
+
+			if (altitudeInMetersRadio.Checked)
+				altitude = _lastGga.Location.AltitudeInMeters;
+
+			altitudeValueLabel.Text = altitude.ToString();
+		}
+
 		private void RefreshDistance ()
 		{
-			float speed = _gps.Knots;
+			float speed = _lastRmc.Knots;
 
 			if (milesPerHourRadio.Checked)
-				speed = _gps.MilesPerHour;
+				speed = _lastRmc.MilesPerHour;
 			else if (kilometersPerHourRadio.Checked)
-				speed = _gps.KilometersPerHour;
+				speed = _lastRmc.KilometersPerHour;
 
 			speedLabel.Text = speed.ToString("N2");
 		}
 
 		private void RefreshSattellites ()
 		{
-			bool redraw = false;
-
-			Satellite[] satellites = _gps.Satellites;
+			Satellite[] satellites = _lastGsv.Satellites;
 			for (int i = 0; i < satellites.Length; i++) {
 				Satellite sat = satellites[i];
 				ListViewItem item = sat.Tag as ListViewItem;
@@ -99,7 +182,6 @@ namespace GPS
 					);
 
 					satelliteList.Items.Add(item);
-					redraw = true;
 				}
 
 				sat.Tag = item;
@@ -129,7 +211,10 @@ namespace GPS
 				e.Graphics.DrawLine(circlePen, new Point(centerX, centerY - 4), new Point(centerX, centerY + 4));
 			}
 
-			Satellite[] satellites = _gps.Satellites;
+			if (_lastGsv == null)
+				return;
+
+			Satellite[] satellites = _lastGsv.Satellites;
 
 			if (satellites != null && satellites.Length > 0) {
 
@@ -171,7 +256,7 @@ namespace GPS
 			}
 
 			using (Pen anglePen = new Pen(Color.Blue, 4F)) {
-				e.Graphics.DrawLine(anglePen, new PointF(centerX, centerY), new PointF((radius * Convert.ToSingle(Math.Cos(_gps.DirectionalAngle))) + centerXF, (radius * Convert.ToSingle(Math.Sin(_gps.DirectionalAngle))) + centerYF));
+				e.Graphics.DrawLine(anglePen, new PointF(centerX, centerY), new PointF((radius * Convert.ToSingle(Math.Cos(_lastRmc.DirectionalAngleInRadians))) + centerXF, (radius * Convert.ToSingle(Math.Sin(_lastRmc.DirectionalAngleInRadians))) + centerYF));
 			}
 		}
 	}

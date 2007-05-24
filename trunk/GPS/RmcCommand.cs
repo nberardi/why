@@ -56,9 +56,14 @@ namespace GPS
 			_magneticVariation = Convert.ToDecimal(data[9]) * (data[10].ToUpper() == "E" ? 1M : -1M);
 		}
 
-		public float DirectionalAngle
+		public float DirectionalAngleInDegrees
 		{
 			get { return _trackAngle ?? 0; }
+		}
+
+		public float DirectionalAngleInRadians
+		{
+			get { return (DirectionalAngleInDegrees - 90F) * Convert.ToSingle(Math.PI / 180D); }
 		}
 
 		public float Knots

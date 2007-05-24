@@ -29,6 +29,26 @@ namespace GPS
 			_altitude = altitude;
 		}
 
+		public decimal Latitude
+		{
+			get { return _latitude; }
+		}
+
+		public decimal Longitude
+		{
+			get { return _longitude; }
+		}
+
+		public float AltitudeInFeet
+		{
+			get { return _altitude * 3.2808399F; }
+		}
+
+		public float AltitudeInMeters
+		{
+			get { return _altitude; }
+		}
+
 		public override string ToString ()
 		{
 			return String.Format("{0:N6},{1:N6}+{2}", _latitude, _longitude, _altitude);
@@ -85,6 +105,16 @@ namespace GPS
 			_meanSeaLevel = Convert.ToSingle(data[11]);
 
 			_location = new Location(latitude, longitude, altitude);
+		}
+
+		public DateTime TakenAt
+		{
+			get { return _takenAt; }
+		}
+
+		public Location Location
+		{
+			get { return _location; }
 		}
 	}
 }
